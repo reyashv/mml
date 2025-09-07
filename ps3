@@ -1,0 +1,107 @@
+//Eulers, Runge-kutta, Trapezoidal, Simpsons
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Differential equation
+def dydt(t, y):
+    return -2 * y + t**2
+
+# Runge-Kutta 4th Order (RK4) solver
+def solve_rk4(dydt, t0, y0, h, num_steps):
+    t_values = [t0]
+    y_values = [y0]
+    t = t0
+    y = y0
+
+    for _ in range(num_steps):
+        k1 = dydt(t, y)
+        k2 = dydt(t + h/2, y + h/2 * k1)
+        k3 = dydt(t + h/2, y + h/2 * k2)
+        k4 = dydt(t + h, y + h * k3)
+
+        y = y + (h/6) * (k1 + 2*k2 + 2*k3 + k4)
+        t = t + h
+
+        t_values.append(t)
+        y_values.append(y)
+
+    return t_values, y_values
+
+# Euler solver
+def solve_euler(dydt, t0, y0, h, num_steps):
+    t_values = [t0]
+    y_values = [y0]
+    t = t0
+    y = y0
+
+    for _ in range(num_steps):
+        y = y + h * dydt(t, y)
+        t = t + h
+
+        t_values.append(t)
+        y_values.append(y)
+
+    return t_values, y_values
+
+
+# Initial conditions
+t0 = 0
+y0 = 1
+h = 0.1
+num_steps = 15
+
+# Solve using RK4 and Euler
+time_rk4, y_rk4 = solve_rk4(dydt, t0, y0, h, num_steps)
+time_euler, y_euler = solve_euler(dydt, t0, y0, h, num_steps)
+
+# Print values
+print("RK4 Y values:", y_rk4)
+print("Euler Y values:", y_euler)
+
+# Plotting
+plt.figure(figsize=(10, 6))
+plt.plot(time_rk4, y_rk4, 'o-', label='RK4 Solution')
+plt.plot(time_euler, y_euler, 'x-', label='Euler Solution')
+plt.xlabel("Time")
+plt.ylabel("y(t)")
+plt.title("RK4 vs Euler Solutions")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+import numpy as np
+
+def f(x):
+    return (1 / np.sqrt(2 * np.pi)) * np.exp(-x**2 / 2)
+
+true_value = 0.977249868051821
+
+def trapezoidal_rule(f, a, b, n):
+    x = np.linspace(a, b, n)
+    y = f(x)
+    h = (b - a) / (n - 1)
+    return h * (0.5 * y[0] + np.sum(y[1:-1]) + 0.5 * y[-1])
+
+def simpsons_rule(f, a, b, n):
+    if (n - 1) % 2 != 0:
+        raise ValueError("Simpson’s rule requires even number of subintervals (odd number of points).")
+    x = np.linspace(a, b, n)
+    y = f(x)
+    h = (b - a) / (n - 1)
+    return (h / 3) * (y[0] + y[-1] + 4 * np.sum(y[1:-1:2]) + 2 * np.sum(y[2:-2:2]))
+
+a, b = -10, 2
+point_counts = [2001, 4001]
+
+print("Points\tTrapezoidal Result\tError\t\tSimpson Result\t\tError")
+print("-" * 80)
+
+for n in point_counts:
+    trap = trapezoidal_rule(f, a, b, n)
+    simp = simpsons_rule(f, a, b, n)
+    trap_err = abs(trap - true_value)
+    simp_err = abs(simp - true_value)
+
+    print(f"{n}\t{trap:.15f}\t{trap_err:.2e}\t{simp:.15f}\t{simp_err:.2e}")
