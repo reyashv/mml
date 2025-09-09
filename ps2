@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 # ------------------ Manual Statistical Tests ------------------
@@ -7,7 +8,7 @@ def manual_t_test(residuals):
     mean_res = np.mean(residuals)
     std_res = np.std(residuals, ddof=1)
     if std_res == 0:
-        return "Undefined (all residuals zero)"
+        return "Undefined"
     return mean_res / (std_res / np.sqrt(n))
 
 def manual_z_test(residuals):
@@ -15,7 +16,7 @@ def manual_z_test(residuals):
     mean_res = np.mean(residuals)
     std_res = np.std(residuals, ddof=0)
     if std_res == 0:
-        return "Undefined (all residuals zero)"
+        return "Undefined"
     return mean_res / (std_res / np.sqrt(n))
 
 # ------------------ Random Dataset ------------------
@@ -24,7 +25,6 @@ x_data = np.linspace(0, 10, 8)
 y_data = np.sin(x_data) + np.random.normal(0, 0.1, len(x_data))  
 
 x_predict = np.linspace(1, 9, 5)
-
 true_vals = np.sin(x_predict)
 
 # ============================================================== 
@@ -60,22 +60,6 @@ def newton_backward(x, x_data, y_data, n):
         y_data_local = diff[::-1]
     return result
 
-pred_forward = [newton_forward(x, x_data, y_data, len(x_data)) for x in x_predict]
-pred_backward = [newton_backward(x, x_data, y_data, len(x_data)) for x in x_predict]
-
-res_forward = np.array(pred_forward) - true_vals
-res_backward = np.array(pred_backward) - true_vals
-
-print("\n--- Newton Forward ---")
-print("Predictions:", pred_forward)
-print("t-test:", manual_t_test(res_forward))
-print("z-test:", manual_z_test(res_forward))
-
-print("\n--- Newton Backward ---")
-print("Predictions:", pred_backward)
-print("t-test:", manual_t_test(res_backward))
-print("z-test:", manual_z_test(res_backward))
-
 # ============================================================== 
 # 2. Divided Difference
 # ============================================================== 
@@ -95,15 +79,6 @@ def newton_poly(coef, x_data, x):
         p = coef[n-i] + (x - x_data[n-i]) * p
     return p
 
-coeffs = newton_divided_diff(x_data, y_data)
-pred_divdiff = [newton_poly(coeffs, x_data, x) for x in x_predict]
-res_divdiff = np.array(pred_divdiff) - true_vals
-
-print("\n--- Newton Divided Difference ---")
-print("Predictions:", pred_divdiff)
-print("t-test:", manual_t_test(res_divdiff))
-print("z-test:", manual_z_test(res_divdiff))
-
 # ============================================================== 
 # 3. Lagrange
 # ============================================================== 
@@ -117,14 +92,6 @@ def lagrange_interpolation(x, x_data, y_data):
                 term *= (x - x_data[j]) / (x_data[i] - x_data[j])
         p += term
     return p
-
-pred_lagrange = [lagrange_interpolation(x, x_data, y_data) for x in x_predict]
-res_lagrange = np.array(pred_lagrange) - true_vals
-
-print("\n--- Lagrange ---")
-print("Predictions:", pred_lagrange)
-print("t-test:", manual_t_test(res_lagrange))
-print("z-test:", manual_z_test(res_lagrange))
 
 # ============================================================== 
 # 4. Cubic Spline
@@ -154,21 +121,86 @@ def cubic_spline_interp(x_data, y_data, M, x):
             return A*y_data[i] + B*y_data[i+1] + C*M[i] + D*M[i+1]
     return None
 
+# ============================================================== 
+# Tables: Forward, Backward, Divided Difference
+# ============================================================== 
+def forward_difference_table(x, y):
+    n = len(y)
+    table = np.zeros((n, n+1))
+    table[:,0] = x
+    table[:,1] = y
+    for j in range(2, n+1):
+        for i in range(n-j+1):
+            table[i,j] = table[i+1,j-1] - table[i,j-1]
+    return table
+
+def backward_difference_table(x, y):
+    n = len(y)
+    table = np.zeros((n, n+1))
+    table[:,0] = x
+    table[:,1] = y
+    for j in range(2, n+1):
+        for i in range(j-1, n):
+            table[i,j] = table[i,j-1] - table[i-1,j-1]
+    return table
+
+def divided_difference_table(x, y):
+    n = len(y)
+    table = np.zeros((n, n+1))
+    table[:,0] = x
+    table[:,1] = y
+    for j in range(2, n+1):
+        for i in range(n-j+1):
+            table[i,j] = (table[i+1,j-1] - table[i,j-1]) / (x[i+j-1] - x[i])
+    return table
+
+# Generate Tables
+fd_table = forward_difference_table(x_data, y_data)
+bd_table = backward_difference_table(x_data, y_data)
+dd_table = divided_difference_table(x_data, y_data)
+
+print("\n===== Forward Difference Table =====")
+print(pd.DataFrame(fd_table, columns=["x","y"] + [f"Δ^{i}y" for i in range(1,len(x_data))]).to_string(index=False, float_format="%.4f"))
+
+print("\n===== Backward Difference Table =====")
+print(pd.DataFrame(bd_table, columns=["x","y"] + [f"∇^{i}y" for i in range(1,len(x_data))]).to_string(index=False, float_format="%.4f"))
+
+print("\n===== Divided Difference Table =====")
+print(pd.DataFrame(dd_table, columns=["x","f[x]"] + [f"Order {i}" for i in range(2,len(x_data)+1)]).to_string(index=False, float_format="%.4f"))
+
+# ============================================================== 
+# Predictions + Residuals + Tests
+# ============================================================== 
+pred_forward = [newton_forward(x, x_data, y_data, len(x_data)) for x in x_predict]
+pred_backward = [newton_backward(x, x_data, y_data, len(x_data)) for x in x_predict]
+
+coeffs = newton_divided_diff(x_data, y_data)
+pred_divdiff = [newton_poly(coeffs, x_data, x) for x in x_predict]
+
+pred_lagrange = [lagrange_interpolation(x, x_data, y_data) for x in x_predict]
+
 M = cubic_spline_coeffs(x_data, y_data)
 pred_spline = [cubic_spline_interp(x_data, y_data, M, x) for x in x_predict]
+
+# Residuals
+res_forward = np.array(pred_forward) - true_vals
+res_backward = np.array(pred_backward) - true_vals
+res_divdiff = np.array(pred_divdiff) - true_vals
+res_lagrange = np.array(pred_lagrange) - true_vals
 res_spline = np.array(pred_spline) - true_vals
 
-print("\n--- Cubic Spline ---")
-print("Predictions:", pred_spline)
-print("t-test:", manual_t_test(res_spline))
-print("z-test:", manual_z_test(res_spline))
+print("\n===== Statistical Tests =====")
+for name, res in zip(
+    ["Forward", "Backward", "Divided Diff", "Lagrange", "Cubic Spline"],
+    [res_forward, res_backward, res_divdiff, res_lagrange, res_spline]
+):
+    print(f"\n--- {name} ---")
+    print("t-test:", manual_t_test(res))
+    print("z-test:", manual_z_test(res))
 
 # ============================================================== 
-# Plot all together
+# Plot for Comparison
 # ============================================================== 
-plt.figure(figsize=(10,6))
-plt.scatter(x_data, y_data, color="black", label="Data points")
-
 x_dense = np.linspace(min(x_data), max(x_data), 200)
 y_forward = [newton_forward(x, x_data, y_data, len(x_data)) for x in x_dense]
 y_backward = [newton_backward(x, x_data, y_data, len(x_data)) for x in x_dense]
@@ -176,13 +208,13 @@ y_divdiff = [newton_poly(coeffs, x_data, x) for x in x_dense]
 y_lagrange = [lagrange_interpolation(x, x_data, y_data) for x in x_dense]
 y_spline = [cubic_spline_interp(x_data, y_data, M, x) for x in x_dense]
 
+plt.figure(figsize=(10,6))
+plt.scatter(x_data, y_data, color="black", label="Data points")
 plt.plot(x_dense, y_forward, label="Forward", color="blue")
 plt.plot(x_dense, y_backward, label="Backward", color="green")
 plt.plot(x_dense, y_divdiff, label="Divided Diff", color="orange")
 plt.plot(x_dense, y_lagrange, label="Lagrange", linestyle="--", color="purple")
 plt.plot(x_dense, y_spline, label="Cubic Spline", linestyle=":", color="red")
-
-plt.scatter(x_predict, pred_spline, marker="*", s=120, color="red", label="Predictions (all methods)")
 plt.legend()
 plt.xlabel("x")
 plt.ylabel("y")
