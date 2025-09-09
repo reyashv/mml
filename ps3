@@ -1,5 +1,4 @@
-//Eulers, Runge-kutta, Trapezoidal, Simpsons
-
+#Eulers, Runge-kutta, Trapezoidal, Simpsons
 
 import numpy as np
 import matplotlib.pyplot as plt
