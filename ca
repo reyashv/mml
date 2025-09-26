@@ -1,0 +1,276 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+yt = np.array([
+    48.7, 45.8, 46.4, 46.2, 44.0,
+    53.8, 47.6, 47.0, 47.6, 51.1,
+    49.1, 46.7, 47.8, 45.8, 45.5,
+    49.2, 54.8, 44.7, 51.1, 47.3,
+    45.3, 43.3, 44.6, 47.1, 53.4,
+    44.9, 50.5, 48.1, 45.4, 51.6,
+    50.8, 46.4, 52.3, 50.5, 53.4,
+    53.9, 52.3, 53.0, 48.6, 52.4,
+    47.9, 49.5, 44.0, 53.8, 52.5,
+    52.0, 50.6, 48.7, 51.4, 47.7
+], dtype=float)
+
+n = len(yt)
+time = np.arange(n)
+
+alpha = 0.3
+
+# First-order smoothing
+first_order = [yt[0]]
+for t in range(1, n):
+    s_t = alpha * yt[t] + (1 - alpha) * first_order[-1]
+    first_order.append(s_t)
+
+# Second-order smoothing (Brown's method)
+y1 = np.zeros(n)
+y2 = np.zeros(n)
+yhat = np.zeros(n)
+
+y1[0] = yt[0]
+y2[0] = yt[0]
+yhat[0] = yt[0]
+
+for t in range(1, n):
+    y1[t] = alpha * yt[t] + (1 - alpha) * y1[t - 1]
+    y2[t] = alpha * y1[t] + (1 - alpha) * y2[t - 1]
+    yhat[t] = 2 * y1[t] - y2[t]
+
+d = yt - yhat
+mean_d = np.mean(d)
+std_d = np.std(d, ddof=1)
+n = len(d)
+
+t_stat = mean_d / (std_d / np.sqrt(n))
+print("t-statistic:", t_stat)
+
+# Plot
+plt.figure(figsize=(12,6))
+plt.plot(time, yt, label='Actual Data', marker='o')
+plt.plot(time, first_order, label='First Order Exp. Smoothing', linestyle='--')
+plt.plot(time, yhat, label="Second Order Exp. Smoothing", linestyle='-.')
+plt.xlabel("Time")
+plt.ylabel("Value")
+plt.title("First & Second Order Exponential Smoothing")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# ACF - PACF
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ACF Calculation (Manual)
+def calculate_acf(series, max_lags):
+    n = len(series)
+    mean = np.mean(series)
+    c0 = np.sum((series - mean) ** 2)
+
+    acf_values = []
+    for k in range(max_lags + 1):
+        if k == 0:
+            ck = c0
+        else:
+            ck = np.sum((series[k:] - mean) * (series[:-k] - mean))
+        acf_values.append(ck / c0)
+    return acf_values
+
+# PACF Calculation (Manual via Yule-Walker)
+def calculate_pacf(series, max_lags):
+    pacf_values = [1.0]  # PACF at lag 0 is always 1
+    for k in range(1, max_lags + 1):
+        X = np.array([series[i:len(series) - k + i] for i in range(k)]).T
+        y = series[k:]
+        beta = np.linalg.lstsq(X, y, rcond=None)[0]
+        pacf_values.append(beta[-1])  # Last coefficient = PACF at lag k
+    return pacf_values
+
+
+df = pd.read_csv('/content/BARODABANK.csv')
+returns = ((df['Close'] - df['Open']) / df['Open']) * 100
+returns = returns.dropna().values
+
+print("Daily Returns (%):")
+print(returns)
+
+# Compute ACF & PACF
+lags = len(returns) - 1
+max_lags_to_plot = min(50, lags)
+
+acf_vals = calculate_acf(returns, max_lags_to_plot)
+pacf_vals = calculate_pacf(returns, max_lags_to_plot)
+
+acf_df = pd.DataFrame({'Lag': range(max_lags_to_plot + 1), 'ACF': acf_vals})
+pacf_df = pd.DataFrame({'Lag': range(max_lags_to_plot + 1), 'PACF': pacf_vals})
+
+#plt.style.use('classic')
+fig, ax = plt.subplots(figsize=(12, 5))
+ax.stem(acf_df['Lag'], acf_df['ACF'])
+
+conf_interval = 1.96 / np.sqrt(len(returns))
+ax.axhline(y=conf_interval, color='r', linestyle='--', label='95% Confidence Interval')
+ax.axhline(y=-conf_interval, color='r', linestyle='--')
+
+ax.set_title('ACF of Daily Returns - BARODABANK')
+ax.set_xlabel('Lag')
+ax.set_ylabel('ACF')
+ax.set_ylim(-1, 1)
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+fig, ax = plt.subplots(figsize=(12, 5))
+ax.stem(pacf_df['Lag'], pacf_df['PACF'])
+
+ax.axhline(y=conf_interval, color='r', linestyle='--', label='95% Confidence Interval')
+ax.axhline(y=-conf_interval, color='r', linestyle='--')
+
+ax.set_title('PACF of Daily Returns - BARODABANK')
+ax.set_xlabel('Lag')
+ax.set_ylabel('PACF')
+ax.set_ylim(-1, 1)
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- Data ---
+year = [1991, 1992, 1993, 1994, 1995]
+spring = [102, 110, 111, 115, 122]
+summer = [120, 126, 128, 135, 144]
+fall = [90, 95, 97, 103, 110]
+winter = [78, 83, 86, 91, 98]
+
+seasonal_df = pd.DataFrame({
+        'year':year,
+        'spring':spring,
+        'summer':summer,
+        'fall':fall,
+        'winter':winter
+    })
+
+seasonal_ts = seasonal_df.melt(id_vars = 'year', var_name = 'season', value_name = 'value')
+seasonal_order = {'spring':1, 'summer':2, 'fall':3, 'winter':4}
+seasonal_ts['quarter'] = seasonal_ts['season'].map(seasonal_order)
+seasonal_ts = seasonal_ts.sort_values(by = ['year', 'quarter'])
+
+# Moving avg & indices
+seasonal_ts['4_point_moving_avg'] = seasonal_ts['value'].rolling(window=4, center=True).mean().rolling(window=2, center=True).mean()
+seasonal_ts['percent_of_moving_avg'] = (seasonal_ts['value']/seasonal_ts['4_point_moving_avg'])*100
+
+modified_seasonal_indices = seasonal_ts.groupby('season')['percent_of_moving_avg'].median()
+normalization_factor = 400/modified_seasonal_indices.sum()
+seasonal_indices = modified_seasonal_indices*normalization_factor
+
+seasonal_ts['seasonal_index'] = seasonal_ts['season'].map(seasonal_indices)
+seasonal_ts['deseasonalized_value'] = (seasonal_ts['value'] / seasonal_ts['seasonal_index']) * 100
+
+# --- Trend fitting manually ---
+deseasonalized_ts_clean = seasonal_ts.dropna(subset=['deseasonalized_value']).copy()
+t = np.arange(len(deseasonalized_ts_clean))
+y = deseasonalized_ts_clean['deseasonalized_value'].values
+n = len(t)
+
+# --- Linear Regression manually ---
+t_mean, y_mean = np.mean(t), np.mean(y)
+m = np.sum((t - t_mean)*(y - y_mean)) / np.sum((t - t_mean)**2)
+c = y_mean - m*t_mean
+y_pred_lin = c + m*t
+
+# --- Quadratic Regression manually ---
+Sx = np.sum(t); Sx2 = np.sum(t**2); Sx3 = np.sum(t**3); Sx4 = np.sum(t**4)
+Sy = np.sum(y); Sxy = np.sum(t*y); Sx2y = np.sum((t**2)*y)
+
+A = np.array([
+    [n, Sx, Sx2],
+    [Sx, Sx2, Sx3],
+    [Sx2, Sx3, Sx4]
+])
+B = np.array([Sy, Sxy, Sx2y])
+
+a_quad, b_quad, c_quad = np.linalg.solve(A, B)
+y_pred_quad = a_quad + b_quad*t + c_quad*(t**2)
+
+# --- Exponential Regression manually ---
+logy = np.log(y)
+logy_mean = np.mean(logy)
+m = np.sum((t - t_mean)*(logy - logy_mean)) / np.sum((t - t_mean)**2)
+c = logy_mean - m*t_mean
+A_exp = np.exp(c)
+y_pred_exp = A_exp * np.exp(m*t)
+
+# --- Manual Paired t-test function ---
+def paired_ttest(y_true, y_pred):
+    d = y_true - y_pred
+    mean_d = np.mean(d)
+    std_d = np.std(d, ddof=1)
+    n = len(d)
+    t_stat = mean_d / (std_d / np.sqrt(n))
+    return t_stat
+
+# --- R² function ---
+def r_squared(y_true, y_pred):
+    ss_res = np.sum((y_true - y_pred)**2)
+    ss_tot = np.sum((y_true - np.mean(y_true))**2)
+    return 1 - ss_res/ss_tot
+
+# --- Results ---
+models = {
+    "Linear": y_pred_lin,
+    "Quadratic": y_pred_quad,
+    "Exponential": y_pred_exp
+}
+
+results = {}
+R2 = {}
+for model, y_pred in models.items():
+    t_stat = paired_ttest(y, y_pred)
+    r2 = r_squared(y, y_pred)
+    results[model] = {"t": t_stat, "R2": r2}
+    R2[r2] = model
+
+print("Results:")
+for model, vals in results.items():
+    print(f"{model}: t={vals['t']:.4f}, R2={vals['R2']:.4f}")
+
+# --- Pick Best Model ---
+maxR2 = max(R2)
+best_model = R2[maxR2]
+print("\nBest model:", best_model)
+
+best_pred = models[best_model]
+
+seasonal_ts['trend'] = np.nan
+seasonal_ts.loc[deseasonalized_ts_clean.index, 'trend'] = best_pred
+
+# Percent trend (actual / trend * 100)
+seasonal_ts['percent_trend'] = (seasonal_ts['value'] / seasonal_ts['trend']) * 100
+
+# Cyclical variation (deseasonalized / trend * 100)
+seasonal_ts['cyclical_variation'] = (seasonal_ts['deseasonalized_value'] / seasonal_ts['trend']) * 100
+
+# Relative cyclical residual (cyclical variation - 100)
+seasonal_ts['relative_cyclical_residual'] = seasonal_ts['cyclical_variation'] - 100
+
+display(seasonal_ts)
+
+# --- Plot Best Fit ---
+plt.figure(figsize=(12,6))
+plt.plot(t, y, 'o-', label='Deseasonalized Data')
+plt.plot(t, best_pred, label=f'{best_model} Trend Fit', linewidth=2)
+plt.title(f"Best Fit Trend: {best_model}")
+plt.xlabel("Time index")
+plt.ylabel("Deseasonalized Value")
+plt.legend()
+plt.grid(True)
+plt.show()
+
